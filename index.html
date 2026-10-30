@@ -29,6 +29,7 @@
   --head:#37507a; --head-ink:#f3f6fb; --gold:#f2c14e; --gold-bg:#3a3018;
   --up:#ff6b63; --down:#4cc47f; --chip:#26324a; --field:#141d2a; color-scheme:dark}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{background:var(--bg)}
 body{color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;margin:0;
   padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px));padding-block:12px 110px}
@@ -73,7 +74,7 @@ td.l,th.l{text-align:left}
 .bar{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--line);z-index:6;
   padding:8px max(12px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
 .bar .in{max-width:640px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;gap:10px}
-.bar span{font-size:.75rem;color:var(--muted);display:block}
+.bar .lbl{font-size:.75rem;color:var(--muted);display:block}
 .pill{display:inline-block;padding:1px 7px;border-radius:99px;font-size:.72rem;background:var(--chip);color:var(--muted)}
 .pill.ok{background:var(--chip);color:var(--ink)} .pill.bad{background:var(--gold-bg);color:var(--gold)}
 details summary{cursor:pointer;font-size:.85rem;color:var(--muted)}
@@ -174,8 +175,8 @@ input.filled{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold);backgroun
 </div>
 
 <div class="bar" id="gBar" hidden><div class="in">
-  <div><span>戰力變化</span><div class="big" id="gDelta">—</div></div>
-  <div style="text-align:right"><span>換裝後戰力</span><div class="num" style="font-size:1.05rem" id="gNew">—</div></div>
+  <div><span class="lbl">戰力變化</span><div class="big" id="gDelta">—</div></div>
+  <div style="text-align:right"><span class="lbl">換裝後戰力</span><div class="num" style="font-size:1.05rem" id="gNew">—</div></div>
 </div></div>
 
 <script>
