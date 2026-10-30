@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="zh-Hant-TW"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>搞鬼M 戰力計算</title>
+<meta name="theme-color" content="#4a6590">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="戰力計算">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+/* Layout: 單欄手機 App — 頂部角色與戰力摘要、分頁切換（角色／換裝／價值），換裝頁底部固定顯示戰力變化 */
+:root{
+  --bg:#eef1f6; --panel:#ffffff; --ink:#1c2738; --muted:#5b687c; --line:#d6dce7;
+  --head:#4a6590; --head-ink:#ffffff; --gold:#9c6a06; --gold-bg:#fff3d1;
+  --up:#d1342f; --down:#1f8a4c; --chip:#e3e8f1; --field:#f6f8fb;
+  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-num:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111823; --panel:#1a2433; --ink:#e3e9f2; --muted:#93a1b6; --line:#2c3a4f;
+  --head:#37507a; --head-ink:#f3f6fb; --gold:#f2c14e; --gold-bg:#3a3018;
+  --up:#ff6b63; --down:#4cc47f; --chip:#26324a; --field:#141d2a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111823; --panel:#1a2433; --ink:#e3e9f2; --muted:#93a1b6; --line:#2c3a4f;
+  --head:#37507a; --head-ink:#f3f6fb; --gold:#f2c14e; --gold-bg:#3a3018;
+  --up:#ff6b63; --down:#4cc47f; --chip:#26324a; --field:#141d2a; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{background:var(--bg)}
+body{color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;margin:0;
+  padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px));padding-block:12px 110px}
+.wrap{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:8px;flex-wrap:wrap}
+.top h1{margin:0;font-size:1.25rem;letter-spacing:.02em}
+.top .cpbox{text-align:right}
+.top .cpbox span{display:block;font-size:.75rem;color:var(--muted)}
+.big{font:600 1.6rem var(--f-num);font-variant-numeric:tabular-nums;color:var(--gold);line-height:1.15}
+.tabs{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+.tabs button{flex:1;padding:10px 4px;border:0;background:var(--panel);color:var(--muted);font:500 .98rem var(--f-body);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--head);color:var(--head-ink)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:10}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.card>h2{margin:0;padding:8px 12px;background:var(--head);color:var(--head-ink);font-size:.95rem;font-weight:700;letter-spacing:.04em;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.card>h2 small{font-weight:400;opacity:.85;font-size:.75rem}
+.body{padding:12px;display:flex;flex-direction:column;gap:10px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px}
+label.f{display:flex;flex-direction:column;gap:2px;font-size:.78rem;color:var(--muted);min-width:0}
+input,select{font:500 .95rem var(--f-num);padding:7px 8px;border:1px solid var(--line);border-radius:6px;background:var(--field);color:var(--ink);width:100%;min-width:0}
+select{font-family:var(--f-body)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.row>*{min-width:0}
+.btn{padding:7px 12px;border-radius:6px;border:1px solid var(--line);background:var(--chip);color:var(--ink);font:500 .88rem var(--f-body);cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--head);color:var(--head-ink);border-color:var(--head)}
+.btn.warn{color:var(--up)}
+.note{color:var(--muted);font-size:.8rem;margin:0}
+.warnbox{background:var(--gold-bg);border-left:3px solid var(--gold);padding:7px 10px;border-radius:4px;font-size:.82rem}
+table{border-collapse:collapse;width:100%;font-size:.86rem}
+th,td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{color:var(--muted);font-weight:500;font-size:.76rem}
+td.l,th.l{text-align:left}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.up{color:var(--up)} .down{color:var(--down)}
+.scroll{overflow-x:auto}
+.gear td{padding:4px 4px}
+.gear td.l{font-size:.84rem;color:var(--ink)}
+.gear input{padding:6px 6px;font-size:.9rem}
+.gear tr.sec td{color:var(--muted);font-size:.74rem;padding-top:10px;border-bottom:0}
+.el td input{padding:6px}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--line);z-index:6;
+  padding:8px max(12px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+.bar .in{max-width:640px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.bar span{font-size:.75rem;color:var(--muted);display:block}
+.pill{display:inline-block;padding:1px 7px;border-radius:99px;font-size:.72rem;background:var(--chip);color:var(--muted)}
+.pill.ok{background:var(--chip);color:var(--ink)} .pill.bad{background:var(--gold-bg);color:var(--gold)}
+details summary{cursor:pointer;font-size:.85rem;color:var(--muted)}
+input.filled{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold);background:var(--gold-bg)}
+.formula{font-family:var(--f-num);font-size:.8rem;background:var(--field);border:1px solid var(--line);border-radius:6px;padding:8px;white-space:pre;overflow-x:auto;line-height:1.6}
+@media (prefers-reduced-motion:no-preference){.tabs button{transition:background .15s}}
+</style>
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+</head><body>
+
+
+
+<div class="wrap">
+  <div class="top">
+    <h1>搞鬼M 戰力計算</h1>
+    <div class="cpbox"><span id="topName">—</span><div class="big" id="topCp">—</div></div>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="ch">角色</button>
+    <button role="tab" aria-selected="false" data-tab="gear">換裝</button>
+    <button role="tab" aria-selected="false" data-tab="val">價值</button>
+  </div>
+
+  <!-- 角色 -->
+  <section data-panel="ch" class="wrap">
+    <div class="card"><h2>角色</h2><div class="body">
+      <div class="row">
+        <select id="chSel" style="flex:1"></select>
+        <button class="btn" id="chAdd">新增</button>
+        <button class="btn warn" id="chDel">刪除</button>
+      </div>
+      <div class="grid">
+        <label class="f">名稱<input id="chName" type="text"></label>
+        <label class="f">職業<select id="chCls"></select></label>
+      </div>
+      <p class="note" id="clsNote"></p>
+    </div></div>
+
+    <div class="card" id="ocrCard" hidden><h2>截圖辨識</h2><div class="body">
+      <p class="note">可一次選多張：能力值頁、詳細能力值、屬性、各能力說明（看 % 用）。辨識後自動填入，黃框為辨識結果，請核對。</p>
+      <div class="row">
+        <button class="btn pri" id="ocrBtn">選擇截圖</button>
+        <input id="ocrFile" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden>
+        <button class="btn" id="ocrPerm" hidden>開啟權限設定</button>
+      </div>
+      <p class="note" id="ocrMsg"></p>
+    </div></div>
+
+    <div class="card"><h2>戰鬥能力值 <small>面板數值</small></h2><div class="body">
+      <div class="grid" id="fPanel"></div>
+    </div></div>
+
+    <div class="card"><h2>屬性 <small>詳細能力值 → 屬性</small></h2><div class="body">
+      <table class="el"><thead><tr><th class="l">屬性</th><th>攻擊力</th><th>防禦力</th></tr></thead><tbody id="fEl"></tbody>
+      <tfoot><tr><td class="l">合計</td><td class="num" id="elA">0</td><td class="num" id="elD">0</td></tr></tfoot></table>
+    </div></div>
+
+    <div class="card"><h2>加成 % <small>點能力名稱看說明</small></h2><div class="body">
+      <div class="grid" id="fPct"></div>
+      <p class="note">把說明裡同一類的 % 全部加總填入，例：物理攻擊力 3 + 5.5 + 187.5 + 2.6 = 198.6。</p>
+    </div></div>
+
+    <div class="card"><h2>能力點總數 <small>能力分配</small></h2><div class="body">
+      <div class="grid" id="fPts"></div>
+      <p class="note">填括號前的總數，例：精力 969 (101+868) 填 969。</p>
+    </div></div>
+
+    <div class="card"><h2>驗證</h2><div class="body">
+      <div class="grid">
+        <label class="f">遊戲顯示戰力<input id="actual" type="text" inputmode="numeric"></label>
+        <div><span class="note">公式戰力</span><div class="num" style="font-size:1.1rem" id="calcCp">—</div><div id="errOut" class="note"></div></div>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- 換裝 -->
+  <section data-panel="gear" class="wrap" hidden>
+    <div class="card"><h2>裝備比較 <small>現有 → 新裝備</small></h2><div class="body">
+      <p class="note">填兩件裝備的全部數值（主屬性＋階級效果＋鬼魂合成＋強化）。同一項有好幾行可以直接打 960+120+80。沒有的留空。</p>
+      <div class="scroll"><table class="gear"><thead><tr><th class="l">項目</th><th>現有</th><th>新裝備</th></tr></thead><tbody id="fGear"></tbody></table></div>
+      <div class="row"><button class="btn" id="gSwap">對調</button><button class="btn warn" id="gClear">清除</button></div>
+    </div></div>
+    <div class="card"><h2>結果</h2><div class="body">
+      <div class="scroll"><table id="gPanel"></table></div>
+      <div class="scroll"><table id="gContrib"></table></div>
+      <p class="note">額外攻擊力 % 實測不影響面板，不列入。弓等武器類型攻擊 % 是否作用在武器本身尚未驗證。</p>
+    </div></div>
+  </section>
+
+  <!-- 價值 -->
+  <section data-panel="val" class="wrap" hidden>
+    <div class="card"><h2>每單位價值 <small>以目前角色計算</small></h2><div class="body">
+      <div class="scroll"><table id="vTbl"></table></div>
+      <p class="note">「裝備」指裝備上寫的數值，會再乘上你的加成 %。</p>
+    </div></div>
+    </section>
+</div>
+
+<div class="bar" id="gBar" hidden><div class="in">
+  <div><span>戰力變化</span><div class="big" id="gDelta">—</div></div>
+  <div style="text-align:right"><span>換裝後戰力</span><div class="num" style="font-size:1.05rem" id="gNew">—</div></div>
+</div></div>
+
+<script>
+/* ---------- 資料定義 ---------- */
+const ARCHER={str:{pmin:5,pmax:5,hp:19},vit:{pmin:4,pmax:8.71},qi:{hp:54.28,def:12.07},int:{mp:18}};
+const CLASSES=[['archer','射手',true],['warrior','武士',false],['assassin','刺客',false],['taoist','道士',false],['strong','力士',false],['xiayin','俠隱',false],['soldier','軍士',false]];
+const COEF=Object.fromEntries(CLASSES.map(([k])=>[k,ARCHER]));
+const PANEL=[['hp','體力'],['mp','鬼力'],['pmin','物攻下限'],['pmax','物攻上限'],['def','防禦力'],['dmgRed','傷害減少'],['crit','暴擊機率%'],['critDmg','暴擊傷害%']];
+const PCT=[['atk','物理攻擊力%'],['hp','體力%'],['def','防禦力%'],['mp','鬼力%'],['vit','精力%'],['str','力量%'],['qi','氣力%'],['int','智力%']];
+const PTS=[['str','力量'],['vit','精力'],['qi','氣力'],['int','智力']];
+const ELN=['火','水','木','金','土'];
+const GEAR=[['sec','基本'],['atk','物理攻擊力'],['hp','體力'],['def','防禦力'],['mp','鬼力'],
+  ['sec','能力'],['str','力量'],['vit','精力'],['qi','氣力'],['int','智力'],
+  ['sec','暴擊與其他'],['crit','暴擊機率%'],['critDmg','暴擊傷害%'],['elemAtk','屬性攻擊'],['elemDef','屬性防禦'],['dmgRed','傷害減少'],
+  ['sec','百分比加成'],['atkP','物理攻擊力%'],['hpP','體力%'],['defP','防禦力%'],['vitP','精力%'],['strP','力量%'],['qiP','氣力%'],['intP','智力%']];
+const GK=GEAR.filter(g=>g[0]!=='sec').map(g=>g[0]);
+const GL=Object.fromEntries(GEAR.filter(g=>g[0]!=='sec'));
+
+function blankChar(id,name){return{id,name,cls:'archer',panel:{},ea:['','','','',''],ed:['','','','',''],pct:{},pts:{},actual:'',gA:{},gB:{}};}
+
+const KEY='gg-cp-app-v2';
+let S={chars:[blankChar('c1','角色 1')],cur:'c1'};
+try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.chars)&&s.chars.length)S=s;}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+const $=id=>document.getElementById(id);
+const ch=()=>S.chars.find(c=>c.id===S.cur)||S.chars[0];
+
+/* ---------- 計算 ---------- */
+function num(v){const s=String(v??'').replace(/[,，\s]/g,'');if(!s)return 0;
+  if(!/^[-+]?\d*\.?\d+([-+]\d*\.?\d+)*$/.test(s))return NaN;
+  return s.match(/[-+]?\d*\.?\d+/g).reduce((a,b)=>a+parseFloat(b),0);}
+const K=(c,cd)=>5*(1+c/100*(1+1.5*cd/100));
+function cpOf(p){return p.hp+p.mp+5*p.def+p.dmgRed+p.elemAtk+p.elemDef+(p.pmin+p.pmax)*K(p.crit,p.critDmg)+31;}
+function panelOf(c){const p={};PANEL.forEach(([k])=>p[k]=num(c.panel[k])||0);
+  p.elemAtk=c.ea.reduce((a,v)=>a+(num(v)||0),0);p.elemDef=c.ed.reduce((a,v)=>a+(num(v)||0),0);return p;}
+function pctOf(c){const o={};PCT.forEach(([k])=>o[k]=num(c.pct[k])||0);return o;}
+function ptsOf(c){const o={};PTS.forEach(([k])=>o[k]=num(c.pts[k])||0);return o;}
+/* d: 裝備差值（新 − 舊） */
+function apply(c,d){
+  const p=panelOf(c),pc=pctOf(c),pt=ptsOf(c),co=COEF[c.cls]||ARCHER,g=k=>d[k]||0;
+  const eff={};PTS.forEach(([s])=>{eff[s]=(pt[s]+g(s))*(1+(pc[s]+g(s+'P'))/100)-pt[s]*(1+pc[s]/100);});
+  const m0=1+pc.atk/100,m1=1+(pc.atk+g('atkP'))/100;
+  const dMin=g('atk')+co.str.pmin*eff.str+co.vit.pmin*eff.vit, dMax=g('atk')+co.str.pmax*eff.str+co.vit.pmax*eff.vit;
+  const h0=1+pc.hp/100,h1=1+(pc.hp+g('hpP'))/100, f0=1+pc.def/100,f1=1+(pc.def+g('defP'))/100, g0=1+pc.mp/100;
+  return{
+    pmin:(p.pmin/m0+dMin)*m1, pmax:(p.pmax/m0+dMax)*m1,
+    hp:(p.hp/h0+g('hp')+co.str.hp*eff.str+co.qi.hp*eff.qi)*h1,
+    def:(p.def/f0+g('def')+co.qi.def*eff.qi)*f1,
+    mp:p.mp+(g('mp')+co.int.mp*eff.int)*g0,
+    crit:p.crit+g('crit'), critDmg:p.critDmg+g('critDmg'),
+    elemAtk:p.elemAtk+g('elemAtk'), elemDef:p.elemDef+g('elemDef'), dmgRed:p.dmgRed+g('dmgRed')};
+}
+const fmt=(v,d=0)=>Number.isFinite(v)?v.toLocaleString('zh-TW',{maximumFractionDigits:d}):'—';
+const sgn=(v,d=0)=>{const r=Number(v.toFixed(d));return (r>0?'+':'')+fmt(r,d);};
+const cls=v=>v>0.5?'up':v<-0.5?'down':'';
+
+/* ---------- 版面 ---------- */
+const field=(id,label,mode='decimal')=>`<label class="f">${label}<input id="${id}" type="text" inputmode="${mode}" autocomplete="off"></label>`;
+$('fPanel').innerHTML=PANEL.map(([k,l])=>field('p_'+k,l)).join('');
+$('fPct').innerHTML=PCT.map(([k,l])=>field('c_'+k,l)).join('');
+$('fPts').innerHTML=PTS.map(([k,l])=>field('t_'+k,l,'numeric')).join('');
+$('fEl').innerHTML=ELN.map((n,i)=>`<tr><td class="l">${n}</td><td><input id="ea${i}" type="text" inputmode="numeric" aria-label="${n}屬性攻擊力"></td><td><input id="ed${i}" type="text" inputmode="numeric" aria-label="${n}屬性防禦力"></td></tr>`).join('');
+$('chCls').innerHTML=CLASSES.map(([k,n,v])=>`<option value="${k}">${n}${v?'':'（點數係數未驗證）'}</option>`).join('');
+$('fGear').innerHTML=GEAR.map(([k,l])=>k==='sec'?`<tr class="sec"><td class="l" colspan="3">${l}</td></tr>`:
+  `<tr><td class="l">${l}</td><td><input id="ga_${k}" type="text" inputmode="text" aria-label="現有 ${l}"></td><td><input id="gb_${k}" type="text" inputmode="text" aria-label="新裝備 ${l}"></td></tr>`).join('');
+if($('coefTbl'))$('coefTbl').innerHTML=`<tr><th class="l">屬性</th><th>物攻下限</th><th>物攻上限</th><th>體力</th><th>防禦</th><th>鬼力</th></tr>`+
+  [['str','力量'],['vit','精力'],['qi','氣力'],['int','智力']].map(([k,l])=>{const c=ARCHER[k];return`<tr><td class="l">${l}</td><td class="num">${c.pmin??'—'}</td><td class="num">${c.pmax??'—'}</td><td class="num">${c.hp??'—'}</td><td class="num">${c.def??'—'}</td><td class="num">${c.mp??'—'}</td></tr>`}).join('')+
+  `<tr><td class="l note" colspan="6">射手實測。其他職業暫用相同係數。</td></tr>`;
+
+/* ---------- 角色載入與儲存 ---------- */
+function loadForm(){
+  const c=ch();
+  $('chSel').innerHTML=S.chars.map(x=>`<option value="${x.id}" ${x.id===c.id?'selected':''}>${x.name||'未命名'}</option>`).join('');
+  $('chName').value=c.name;$('chCls').value=c.cls;
+  PANEL.forEach(([k])=>$('p_'+k).value=c.panel[k]??'');
+  PCT.forEach(([k])=>$('c_'+k).value=c.pct[k]??'');
+  PTS.forEach(([k])=>$('t_'+k).value=c.pts[k]??'');
+  ELN.forEach((_,i)=>{$('ea'+i).value=c.ea[i]??'';$('ed'+i).value=c.ed[i]??'';});
+  $('actual').value=c.actual||'';
+  GK.forEach(k=>{$('ga_'+k).value=(c.gA||{})[k]??'';$('gb_'+k).value=(c.gB||{})[k]??'';});
+  render();
+}
+function readForm(){
+  const c=ch();
+  c.name=$('chName').value.trim();c.cls=$('chCls').value;
+  PANEL.forEach(([k])=>c.panel[k]=$('p_'+k).value);
+  PCT.forEach(([k])=>c.pct[k]=$('c_'+k).value);
+  PTS.forEach(([k])=>c.pts[k]=$('t_'+k).value);
+  ELN.forEach((_,i)=>{c.ea[i]=$('ea'+i).value;c.ed[i]=$('ed'+i).value;});
+  c.actual=$('actual').value;
+  c.gA={};c.gB={};GK.forEach(k=>{c.gA[k]=$('ga_'+k).value;c.gB[k]=$('gb_'+k).value;});
+  save();
+}
+document.querySelectorAll('input,select').forEach(el=>{if(el.id==='chSel'||el.id==='ocrFile')return;el.addEventListener('input',()=>{el.classList.remove('filled');readForm();render();});});
+$('chSel').onchange=()=>{S.cur=$('chSel').value;save();loadForm();};
+$('chAdd').onclick=()=>{const c=blankChar('c'+Date.now(),'角色 '+(S.chars.length+1));
+  S.chars.push(c);S.cur=c.id;save();loadForm();$('chName').focus();$('chName').select();};
+$('chDel').onclick=()=>{const b=$('chDel');
+  if(S.chars.length<2){b.textContent='至少保留一個';setTimeout(()=>b.textContent='刪除',1500);return;}
+  if(!b.dataset.armed){b.dataset.armed=1;b.textContent='確認刪除';setTimeout(()=>{delete b.dataset.armed;b.textContent='刪除';},3000);return;}
+  delete b.dataset.armed;b.textContent='刪除';S.chars=S.chars.filter(x=>x.id!==S.cur);S.cur=S.chars[0].id;save();loadForm();};
+$('gSwap').onclick=()=>{GK.forEach(k=>{const a=$('ga_'+k).value;$('ga_'+k).value=$('gb_'+k).value;$('gb_'+k).value=a;});readForm();render();};
+$('gClear').onclick=()=>{const b=$('gClear');
+  if(!b.dataset.armed){b.dataset.armed=1;b.textContent='確認清除';setTimeout(()=>{delete b.dataset.armed;b.textContent='清除';},3000);return;}
+  delete b.dataset.armed;b.textContent='清除';GK.forEach(k=>{$('ga_'+k).value='';$('gb_'+k).value='';});readForm();render();};
+
+/* ---------- 分頁 ---------- */
+let TAB='ch';
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{TAB=b.dataset.tab;
+  document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected',x===b));
+  document.querySelectorAll('[data-panel]').forEach(p=>p.hidden=p.dataset.panel!==TAB);
+  $('gBar').hidden=TAB!=='gear';window.scrollTo(0,0);});
+
+/* ---------- 顯示 ---------- */
+function render(){
+  const c=ch(),p=panelOf(c),cp=cpOf(p);
+  const bad=[...PANEL.map(([k])=>c.panel[k]),...c.ea,...c.ed].some(v=>Number.isNaN(num(v)))||!num(c.panel.hp)||!num(c.panel.pmin)||!num(c.panel.pmax);
+  $('topName').textContent=c.name||'未命名';
+  $('topCp').textContent=bad?'—':fmt(Math.round(cp));
+  $('elA').textContent=fmt(p.elemAtk);$('elD').textContent=fmt(p.elemDef);
+  const v=CLASSES.find(x=>x[0]===c.cls);
+  $('clsNote').innerHTML=v&&!v[2]?'<span class="warnbox" style="display:block">戰力公式各職業通用。能力點換算係數只有射手實測過，此職業暫用射手係數，「換裝」頁裡力量、精力、氣力、智力的換算可能有誤差。</span>':'';
+  $('calcCp').textContent=bad?'—':fmt(Math.round(cp));
+  const a=num(c.actual);
+  if(a&&!bad){const e=a-Math.round(cp);$('errOut').innerHTML=`誤差 <span class="num">${sgn(e)}</span> <span class="pill ${Math.abs(e)>100?'bad':'ok'}">${Math.abs(e)>100?'需檢查':'吻合'}</span>`;}
+  else $('errOut').textContent='';
+  if(bad){$('gDelta').textContent='—';$('gNew').textContent='—';
+    $('gPanel').innerHTML='<tr><td class="l note">先在「角色」頁填好面板數值。</td></tr>';$('gContrib').innerHTML='';
+    $('vTbl').innerHTML='<tr><td class="l note">先在「角色」頁填好面板數值。</td></tr>';return;}
+  renderGear(c,p,cp);renderVal(c,cp);
+}
+function gearDelta(c){const d={},A=c.gA||{},B=c.gB||{};let err=false;
+  GK.forEach(k=>{const a=num(A[k]),b=num(B[k]);if(Number.isNaN(a)||Number.isNaN(b))err=true;else if(b-a)d[k]=b-a;});return{d,err};}
+function renderGear(c,p,cp){
+  const {d,err}=gearDelta(c);
+  if(err){$('gDelta').innerHTML='<span style="font-size:.9rem">格式錯誤</span>';$('gNew').textContent='—';$('gPanel').innerHTML='';$('gContrib').innerHTML='';return;}
+  const n=apply(c,d),cn=cpOf(n),dd=cn-cp;
+  $('gDelta').innerHTML=`<span class="${cls(dd)}">${sgn(dd)}</span>`;$('gNew').textContent=fmt(Math.round(cn));
+  const rows=[['pmin','物攻下限'],['pmax','物攻上限'],['hp','體力'],['def','防禦力'],['mp','鬼力'],['crit','暴擊機率%',1],['critDmg','暴擊傷害%',1],['elemAtk','屬性攻擊'],['elemDef','屬性防禦'],['dmgRed','傷害減少']]
+    .map(([k,l,dp])=>{const x=n[k]-p[k];if(Math.abs(x)<0.05)return'';return`<tr><td class="l">${l}</td><td class="num">${fmt(p[k],dp?1:0)}</td><td class="num">${fmt(n[k],dp?1:0)}</td><td class="num ${cls(x)}">${sgn(x,dp?1:0)}</td></tr>`;}).join('');
+  $('gPanel').innerHTML=rows?`<tr><th class="l">面板</th><th>現在</th><th>換裝後</th><th>差</th></tr>`+rows:`<tr><td class="l note">兩件裝備數值相同，或尚未填寫。</td></tr>`;
+  const keys=Object.keys(d);let sum=0;
+  let h=keys.map(k=>{const x=cpOf(apply(c,{[k]:d[k]}))-cp;sum+=x;return`<tr><td class="l">${GL[k]}</td><td class="num ${cls(d[k])}">${sgn(d[k],2)}</td><td class="num ${cls(x)}">${sgn(x)}</td></tr>`;}).join('');
+  const inter=dd-sum;if(keys.length>1&&Math.abs(inter)>=1)h+=`<tr><td class="l">項目間加乘</td><td></td><td class="num ${cls(inter)}">${sgn(inter)}</td></tr>`;
+  $('gContrib').innerHTML=keys.length?`<tr><th class="l">裝備差異</th><th>數值差</th><th>戰力</th></tr>`+h:'';
+}
+function renderVal(c,cp){
+  const u=[['精力 +1',{vit:1}],['力量 +1',{str:1}],['氣力 +1',{qi:1}],['智力 +1',{int:1}],
+    ['裝備物攻 +1',{atk:1}],['裝備體力 +1',{hp:1}],['裝備防禦 +1',{def:1}],['裝備鬼力 +1',{mp:1}],
+    ['暴擊機率 +1%',{crit:1}],['暴擊傷害 +1%',{critDmg:1}],['任一屬性攻擊或防禦 +1',{elemAtk:1}],['傷害減少 +1',{dmgRed:1}],
+    ['物理攻擊力% +1%',{atkP:1}],['體力% +1%',{hpP:1}],['防禦力% +1%',{defP:1}],['精力% +1%',{vitP:1}],['力量% +1%',{strP:1}]];
+  const base=cpOf(apply(c,{}));
+  $('vTbl').innerHTML=`<tr><th class="l">增加</th><th>戰力</th></tr>`+u.map(([l,d])=>{const x=cpOf(apply(c,d))-base;return`<tr><td class="l">${l}</td><td class="num">${fmt(x,x<100?1:0)}</td></tr>`}).join('');
+}
+
+/* ---------- 截圖辨識 ---------- */
+const PCTH={'物理攻擊力':'atk','體力':'hp','防禦力':'def','鬼力':'mp','精力':'vit','力量':'str','氣力':'qi','智力':'int'};
+const ELI={'火':0,'水':1,'木':2,'金':3,'土':4};
+function emptyR(){return{panel:{},pct:{},pts:{},ea:[],ed:[]};}
+function merge(a,b){['panel','pct','pts'].forEach(k=>{for(const[x,v]of Object.entries(b[k]||{}))if(a[k][x]==null&&v!=null&&v!=='')a[k][x]=+v;});
+  ['ea','ed'].forEach(k=>(b[k]||[]).forEach((v,i)=>{if(a[k][i]==null&&v!=null&&v!=='')a[k][i]=+v;}));return a;}
+function fillFrom(r){let n=0;const put=(id,v)=>{if(v==null||!Number.isFinite(+v))return;const el=$(id);el.value=String(v);el.classList.add('filled');n++;};
+  PANEL.forEach(([k])=>put('p_'+k,r.panel[k]));PCT.forEach(([k])=>put('c_'+k,r.pct[k]));PTS.forEach(([k])=>put('t_'+k,r.pts[k]));
+  ELN.forEach((_,i)=>{put('ea'+i,r.ea[i]);put('ed'+i,r.ed[i]);});readForm();render();return n;}
+const PROMPT=`這些是手機遊戲《搞鬼M》的角色截圖（可能包含：能力值頁、詳細能力值、屬性、各能力的說明視窗）。
+請讀出畫面上看得到的數值，只輸出 JSON，不要其他文字。看不到的欄位省略，不要猜。格式：
+{"panel":{"hp":體力,"mp":鬼力,"pmin":物理攻擊力下限,"pmax":物理攻擊力上限,"def":防禦力,"dmgRed":傷害減少(整數那一項，不是%),"crit":暴擊機率數字,"critDmg":暴擊傷害量數字},
+"ea":[火,水,木,金,土 屬性攻擊力],"ed":[火,水,木,金,土 屬性防禦力],
+"pct":{"atk":物理攻擊力(%)區塊所有%相加,"hp":體力(%)相加,"def":防禦力(%)相加,"mp":鬼力(%)相加,"vit":精力(%)相加,"str":力量(%)相加,"qi":氣力(%)相加,"int":智力(%)相加},
+"pts":{"str":力量總數,"vit":精力總數,"qi":氣力總數,"int":智力總數}}
+規則：戰鬥能力值與詳細能力值的物理攻擊力不同時，以左側戰鬥能力值為準。pct 只加總標題為「XX(%)」底下的百分比，「額外攻擊力(%)」不要算進 atk。pts 取括號前的總數，例如「969 (101+868)」填 969。ea/ed 看不到的位置填 null。數字不含逗號。`;
+async function ocrClaude(sample,lim,files,msg){
+  const max=lim.images.maxCount||5,r=emptyR();
+  for(let i=0;i<files.length;i+=max){const b=files.slice(i,i+max);msg(`Claude 辨識中 ${Math.min(i+max,files.length)}/${files.length}…`);
+    const j=await sample.json(PROMPT,{images:b,modelTier:'default'});merge(r,j||{});}
+  return r;
+}
+let ENG=null;
+async function engine(){if(ENG)return ENG;
+  try{if(window.claude&&window.claude.use){const s=await window.claude.use('sample');if(s){const l=await s.limits().catch(()=>null);if(l&&l.images)return ENG={kind:'claude',s,l};}}}catch(e){}
+  return ENG={kind:'local'};}
+$('ocrBtn').onclick=()=>$('ocrFile').click();
+async function permApi(){try{return window.claude&&window.claude.use?await window.claude.use('permissions'):null;}catch(e){return null;}}
+const msgO=t=>$('ocrMsg').textContent=t;
+function showDenied(){msgO('目前未允許讀取圖片。按「開啟權限設定」重新允許；若打不開，請重新整理頁面後再選一次截圖，或到頁面右上角選單的「權限」開啟。');$('ocrPerm').hidden=false;}
+$('ocrPerm').onclick=async()=>{const p=await permApi();
+  if(!p){showDenied();return;}
+  try{await p.manage();const st=await p.state('sample');
+    if(st==='granted'||st==='prompt'){$('ocrPerm').hidden=true;msgO('已可使用，請重新選擇截圖。');}else showDenied();}
+  catch(e){msgO('權限面板無法開啟。請重新整理頁面後再選一次截圖，或到頁面右上角選單的「權限」開啟。');}};
+$('ocrFile').onchange=async()=>{
+  const files=[...$('ocrFile').files];$('ocrFile').value='';if(!files.length)return;
+  const msg=msgO;$('ocrBtn').disabled=true;
+  try{const e=await engine();
+    if(e.kind!=='claude'){msg('此版本不支援截圖辨識');return;}
+    const p=await permApi();
+    if(p){const st=await p.state('sample').catch(()=>null);
+      if(st==='denied'){const r=await p.request(['sample']).catch(()=>null);if(!r||r.sample!=='granted'){showDenied();return;}}}
+    $('ocrPerm').hidden=true;
+    const r=await ocrClaude(e.s,e.l,files,msg);
+    const n=fillFrom(r);msg(n?`已填入 ${n} 項，黃框請核對`:'沒有讀到數值，請換清楚一點的截圖或手動輸入');
+  }catch(err){
+    const code=err&&err.code;
+    if(code==='not_granted'){showDenied();}
+    else msg(code==='rate_limited'?'使用次數已達上限，請稍後再試':'辨識失敗，請手動輸入');
+  }finally{$('ocrBtn').disabled=false;}
+};
+
+loadForm();
+engine().then(e=>{if(e.kind==='claude')$('ocrCard').hidden=false;});
+if('serviceWorker' in navigator&&location.protocol==='https:'&&!/claude\.ai|claudeusercontent/.test(location.host)){
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+</script>
+
+</body></html>
